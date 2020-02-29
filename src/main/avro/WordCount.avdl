@@ -1,0 +1,9 @@
+@namespace("com.rymanske.avro.example")
+protocol WordCountProtocol {
+
+  record WordCount {
+    string word;
+    long count;
+  }
+
+}

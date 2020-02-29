@@ -1,0 +1,108 @@
+import com.commercehub.gradle.plugin.avro.GenerateAvroProtocolTask
+import com.commercehub.gradle.plugin.avro.GenerateAvroSchemaTask
+
+buildscript {
+    repositories {
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+        maven {
+            url "http://packages.confluent.io/maven/"
+        }
+    }
+    dependencies {
+        classpath "com.commercehub.gradle.plugin:gradle-avro-plugin:0.18.0"
+    }
+}
+
+plugins {
+    id "com.github.imflog.kafka-schema-registry-gradle-plugin" version "0.8.0"
+}
+
+apply plugin: "com.commercehub.gradle.plugin.avro-base"
+
+group = 'com.rymanske'
+version = '0.0.1-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+File avdlSrcDir = file("src/main/avro")
+File avprOutputDir = file("build/generated-avro-avpr")
+File avscOutputDir = file("build/generated-avro-avsc")
+
+// Generate Avro protocol files from IDL files
+task generateProtocol(type: GenerateAvroProtocolTask) {
+    source avdlSrcDir
+    include "**/*.avdl"
+    outputDir = avprOutputDir
+}
+
+// Generate Avro schema files from protocol files
+task generateSchema(type: GenerateAvroSchemaTask) {
+    dependsOn tasks.generateProtocol
+    source avprOutputDir
+    include "**/*.avpr"
+    outputDir = avscOutputDir
+}
+
+
+// Configure schema registry plugin
+
+// ====== Should work =====
+//schemaRegistry {
+//    url = "http://localhost:8081"
+//    compatibility {
+//        fileTree(dir: avscOutputDir, include: "**/*.avsc").each { file ->
+//            def subjectName = file.name.replace(".avsc", "").toLowerCase() + "-value"
+//            subject(subjectName, relativePath(file))
+//        }
+//    }
+//}
+// =====================
+
+
+// ===== This works =====
+schemaRegistry {
+    url = "http://localhost:8081"
+}
+
+tasks.whenTaskAdded { task ->
+    if (task.name == "testSchemasTask") {
+        task.doFirst {
+            schemaRegistry {
+                compatibility {
+                    fileTree(dir: avscOutputDir, include: "**/*.avsc").each { file ->
+                        def subjectName = file.name.replace(".avsc", "").toLowerCase() + "-value"
+                        subject(subjectName, relativePath(file))
+                    }
+                }
+            }
+        }
+    }
+}
+// =====================
+
+
+
+// Configuration to register schemas to local schema registry for testing
+schemaRegistry {
+    register {
+        fileTree(dir: avscOutputDir, include: "**/*.avsc").each { file ->
+            def subjectName = file.name.replace(".avsc", "").toLowerCase() + "-value"
+            subject(subjectName, relativePath(file))
+        }
+    }
+}
+
+task clean {
+    doFirst {
+        delete rootProject.buildDir
+    }
+}
+
+task build {
+    dependsOn tasks.generateSchema, "testSchemasTask"
+}
+

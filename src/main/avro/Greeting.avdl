@@ -1,0 +1,9 @@
+@namespace("com.rymanske.avro.example")
+protocol GreetingProtocol {
+
+  record Greeting {
+    string messageText;
+    string recipientName;
+  }
+
+}
