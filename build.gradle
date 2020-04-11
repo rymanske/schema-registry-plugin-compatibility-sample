@@ -16,7 +16,7 @@ buildscript {
 }
 
 plugins {
-    id "com.github.imflog.kafka-schema-registry-gradle-plugin" version "0.8.0"
+    id "com.github.imflog.kafka-schema-registry-gradle-plugin" version "0.9.0"
 }
 
 apply plugin: "com.commercehub.gradle.plugin.avro-base"
@@ -50,40 +50,26 @@ task generateSchema(type: GenerateAvroSchemaTask) {
 
 // Configure schema registry plugin
 
-// ====== Should work =====
-//schemaRegistry {
-//    url = "http://localhost:8081"
-//    compatibility {
-//        fileTree(dir: avscOutputDir, include: "**/*.avsc").each { file ->
-//            def subjectName = file.name.replace(".avsc", "").toLowerCase() + "-value"
-//            subject(subjectName, relativePath(file))
-//        }
-//    }
-//}
-// =====================
-
-
-// ===== This works =====
-schemaRegistry {
-    url = "http://localhost:8081"
-}
-
-tasks.whenTaskAdded { task ->
-    if (task.name == "testSchemasTask") {
-        task.doFirst {
-            schemaRegistry {
-                compatibility {
-                    fileTree(dir: avscOutputDir, include: "**/*.avsc").each { file ->
-                        def subjectName = file.name.replace(".avsc", "").toLowerCase() + "-value"
-                        subject(subjectName, relativePath(file))
-                    }
+// ==== Configure schema registry compatibility
+task configSchemaReg() {
+    doFirst {
+        schemaRegistry {
+            url = "http://localhost:8081"
+            compatibility {
+                fileTree(dir: avscOutputDir, include: "**/*.avsc").each { file ->
+                    def subjectName = file.name.replace(".avsc", "").toLowerCase() + "-value"
+                    subject(subjectName, relativePath(file))
+                    println "Checking compatibility for subject $subjectName"
                 }
             }
         }
     }
 }
-// =====================
 
+tasks.named("testSchemasTask") {
+    it.dependsOn(tasks.configSchemaReg)
+}
+// =====================
 
 
 // Configuration to register schemas to local schema registry for testing
